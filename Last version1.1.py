@@ -38,6 +38,12 @@ def save_file(items,path):
 
 
 def get_html(url, params):
+    """
+    Gets HTML from url link as String, ready to be parsed.
+    :param url: Link of webpage
+    :param params: Different params for current webpage
+    :return:
+    """
     a = S.get(url, headers=HEADERS, params=params)
     return a
 
