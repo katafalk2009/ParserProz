@@ -16,6 +16,12 @@ S = requests.Session()
 R = S.post(URL_LOGIN, data=DATA)
 
 def save_file(items,path):
+    """
+    Saving all parsed data in file.
+    :param items: List of dictionaries, with all parsed data
+    :param path: String, path and name of File to save data.
+    :return:
+    """
     with open (path, 'w', newline='') as file:
         writer= csv.writer(file, delimiter=';')
         writer.writerow(['номер', 'Регіон', 'КОД ДК', 'Вартість', 'название', 'Замовник', 'ссылка', 'Процедура',
