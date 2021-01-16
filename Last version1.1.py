@@ -6,10 +6,11 @@ import time
 
 HEADERS = {'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
                          '(KHTML, like Gecko) Chrome/83.0.4103.106 Safari/537.36', 'accept': '*/*'}
-URL = input('Enter URL-link, which starts with https://zakupki.prom.ua/gov/tenders: ')
+URL = 'https://zakupki.prom.ua/gov/' \
+      'tenders?status=6&location=69-72&primary_classifier=45000000-7&createdFrom=2020-01-01&createdTo=2020-01-31'
 FILE = 'tenders.csv'
 
-DATA = {"email": input('email: '), "password": input('pass: ')}
+DATA = {"email": 'katafalk2009@gmail.com', "password": 'katafalk2009'}
 URL_LOGIN = 'https://zakupki.prom.ua/signin'
 COUNTER = 0
 
@@ -303,7 +304,7 @@ def parse(url):
     if html.status_code == 200:
         tenders = []
         pages_count = get_pages_count(html.text)
-        for page in range(1,  2):
+        for page in range(1,  pages_count+1):
             print(f'Parsing page {page}')
             html = get_html(URL, params={'p': page})
             tenders.extend(get_content(html.text))
