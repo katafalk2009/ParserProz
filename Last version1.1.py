@@ -3,11 +3,10 @@ from bs4 import BeautifulSoup
 import csv
 import os
 import time
+import calendar
 
 HEADERS = {'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
                          '(KHTML, like Gecko) Chrome/83.0.4103.106 Safari/537.36', 'accept': '*/*'}
-URL = 'https://zakupki.prom.ua/gov/' \
-      'tenders?status=6&location=69-72&primary_classifier=45000000-7&createdFrom=2020-01-01&createdTo=2020-01-31'
 FILE = 'tenders.csv'
 
 DATA = {"email": 'katafalk2009@gmail.com', "password": 'katafalk2009'}
@@ -304,6 +303,7 @@ def parse(url):
     if html.status_code == 200:
         tenders = []
         pages_count = get_pages_count(html.text)
+        print('Q-ty of pages: ', pages_count)
         for page in range(1,  pages_count+1):
             print(f'Parsing page {page}')
             html = get_html(URL, params={'p': page})
@@ -314,6 +314,12 @@ def parse(url):
         print('Error')
 
 
+month = input('Enter month: ')
+days_in_month=calendar.monthrange(int(2020),int(month))[1]
+location = input('Enter location: ')
 start_time = time.time()
+URL = f'https://zakupki.prom.ua/gov/tenders?status=6&location={location}' \
+      f'&primary_classifier=45000000-7&createdFrom=2020-{month}-01&createdTo=2020-{month}-{days_in_month}'
 parse(URL)
+
 print("--- %s seconds ---" % (time.time() - start_time))
