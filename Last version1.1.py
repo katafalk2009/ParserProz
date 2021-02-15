@@ -314,12 +314,8 @@ def parse(url):
         print('Error')
 
 
-month = input('Enter month: ')
-days_in_month=calendar.monthrange(int(2020),int(month))[1]
-location = input('Enter location: ')
 start_time = time.time()
-URL = f'https://zakupki.prom.ua/gov/tenders?status=6&location={location}' \
-      f'&primary_classifier=45000000-7&createdFrom=2020-{month}-01&createdTo=2020-{month}-{days_in_month}'
+URL = 'https://zakupki.prom.ua/gov/tenders?status=6&primary_classifier=45000000-7&createdFrom=2021-01-01'
 parse(URL)
 
 print("--- %s seconds ---" % (time.time() - start_time))
