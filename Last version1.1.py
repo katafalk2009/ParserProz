@@ -24,7 +24,7 @@ def save_file(items, path):
     :param path: String, path and name of File to save data.
     :return:
     """
-    with open(path, 'w', newline='') as file:
+    with open(path, 'w', newline='', encoding='utf-8') as file:
         writer = csv.writer(file, delimiter=';')
         writer.writerow(['номер', 'Регіон', 'КОД ДК', 'Вартість', 'название', 'Замовник', 'ссылка', 'Процедура',
                          'Статус', 'Переможець', 'ЕДРПОУ', 'Имя', 'Email', 'Телефон',
@@ -74,7 +74,7 @@ def get_link_cabinet(url):
     html = get_html(url, params=None)
     if html.status_code == 200:
         soup = BeautifulSoup(html.text, 'html.parser')
-        link_cabinet = soup.find('a', class_='zk-button zk-button_theme_green h-mb-25').get('href')
+        link_cabinet = soup.find('button', class_='zk-button zk-button_theme_green h-mb-25').get('onclick')[13:-12]
         return link_cabinet
     else:
         print('Error')
@@ -91,6 +91,7 @@ def get_content_page(url):
         soup = BeautifulSoup(html.text, 'html.parser')
         return soup
     else:
+        print(html.status_code)
         return None
 
 
@@ -304,7 +305,8 @@ def parse(url):
         tenders = []
         pages_count = get_pages_count(html.text)
         print('Q-ty of pages: ', pages_count)
-        for page in range(1,  pages_count+1):
+        #for page in range(1,  pages_count+1):
+        for page in range(3, 4):
             print(f'Parsing page {page}')
             html = get_html(URL, params={'p': page})
             tenders.extend(get_content(html.text))
@@ -315,7 +317,7 @@ def parse(url):
 
 
 start_time = time.time()
-URL = 'https://zakupki.prom.ua/gov/tenders?status=6&primary_classifier=45000000-7&createdFrom=2021-01-01'
+URL = 'https://zakupki.prom.ua/gov/tenders?status=6&location=69-72&primary_classifier=45330000-9&createdFrom=2021-03-01&createdTo=2021-03-30'
 parse(URL)
 
 print("--- %s seconds ---" % (time.time() - start_time))
