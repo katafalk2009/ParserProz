@@ -3,7 +3,9 @@ from bs4 import BeautifulSoup
 import csv
 import os
 import time
-import calendar
+from multiprocessing import Pool
+from random import choice
+from fake_useragent import UserAgent
 
 HEADERS = {'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
                          '(KHTML, like Gecko) Chrome/83.0.4103.106 Safari/537.36', 'accept': '*/*'}
@@ -11,10 +13,11 @@ FILE = 'tenders.csv'
 
 DATA = {"email": 'katafalk2009@gmail.com', "password": 'katafalk2009'}
 URL_LOGIN = 'https://zakupki.prom.ua/signin'
-COUNTER = 0
-
+URL = 'https://zakupki.prom.ua/gov/tenders?status=6&primary_classifier=45000000-7&createdFrom=2021-03-01&createdTo=2021-03-30'
 S = requests.Session()
 R = S.post(URL_LOGIN, data=DATA)
+proxylist = open('proxie.txt').read().split('\n')
+ua = UserAgent()
 
 
 def save_file(items, path):
@@ -24,14 +27,10 @@ def save_file(items, path):
     :param path: String, path and name of File to save data.
     :return:
     """
-    with open(path, 'w', newline='', encoding='utf-8') as file:
+    with open(path, 'a', newline='', encoding='utf-8') as file:
         writer = csv.writer(file, delimiter=';')
-        writer.writerow(['номер', 'Регіон', 'КОД ДК', 'Вартість', 'название', 'Замовник', 'ссылка', 'Процедура',
-                         'Статус', 'Переможець', 'ЕДРПОУ', 'Имя', 'Email', 'Телефон',
-                         'участник1', 'ЕДРПОУ уч1', 'участник2', 'ЕДРПОУ уч2', 'участник3',
-                         'ЕДРПОУ уч3', 'участник4', 'ЕДРПОУ уч4'])
         for item in items:
-            writer.writerow([item['number'], item['region'], item['code DK'], item['value'], item['title'],
+            writer.writerow([item['region'], item['code DK'], item['value'], item['title'],
                              item['organizer'], item['link'], item['procedure'], item['status'], item['award'],
                              item['EDRPOU'], item['contact'], item['e-mail'], item['telephone'],
                             item['participants'][0], item['participants'][1],
@@ -47,7 +46,9 @@ def get_html(url, params):
     :param params: Different params for current webpage
     :return:
     """
-    a = S.get(url, headers=HEADERS, params=params)
+    proxy = {'https': 'https://' + choice(proxylist)}
+    useragent = {'user-agent': ua.random}
+    a = S.get(url, headers=useragent, params=params)
     return a
 
 
@@ -245,7 +246,6 @@ def parse_page(soup, link, item):
     :return:
     """
     tender_dict = {
-                    'number': COUNTER,
                     'region': get_region(soup),
                     'code DK': get_dk(soup),
                     'value': get_value(soup),
@@ -272,12 +272,10 @@ def get_content(html):
     """
     soup = BeautifulSoup(html, 'html.parser')
     items = soup.find_all('div', class_='zk-state-list__row qa_state_purchase_list')
-    tenders = []
+    smalltenders = []
     for item in items:
-        global COUNTER
-        COUNTER += 1
-        print(f'Parsing tender {COUNTER}')
         link = item.find('a', class_='h-break-word qa_title_link').get('href')
+        print('parsing link:',link)
         new_link = get_link_cabinet(link)
         soup_content = get_content_page(new_link)
         link_list = []
@@ -288,11 +286,17 @@ def get_content(html):
             for l in link_list:
                 soup_content = get_content_page(l)
                 tender_dict = parse_page(soup_content, link, item)
-                tenders.append(tender_dict)
+                smalltenders.append(tender_dict)
         else:
             tender_dict = parse_page(soup_content, link, item)
-            tenders.append(tender_dict)
-    return tenders
+            smalltenders.append(tender_dict)
+
+    return smalltenders
+
+
+def multi_fun(html):
+    tender = get_content(html)
+    save_file(tender, FILE)
 
 
 def parse(url):
@@ -301,23 +305,37 @@ def parse(url):
     :return:
     """
     html = get_html(url, params=None)
+    with open(FILE, 'w', newline='', encoding='utf-8') as file:
+        writer = csv.writer(file, delimiter=';')
+        writer.writerow(['Регіон', 'КОД ДК', 'Вартість', 'название', 'Замовник', 'ссылка', 'Процедура',
+                         'Статус', 'Переможець', 'ЕДРПОУ', 'Имя', 'Email', 'Телефон',
+                         'участник1', 'ЕДРПОУ уч1', 'участник2', 'ЕДРПОУ уч2', 'участник3',
+                         'ЕДРПОУ уч3', 'участник4', 'ЕДРПОУ уч4'])
     if html.status_code == 200:
-        tenders = []
+
+        all_html = []
         pages_count = get_pages_count(html.text)
         print('Q-ty of pages: ', pages_count)
         #for page in range(1,  pages_count+1):
-        for page in range(3, 4):
-            print(f'Parsing page {page}')
-            html = get_html(URL, params={'p': page})
-            tenders.extend(get_content(html.text))
-        save_file(tenders, FILE)
+        for page in range(1, 40):
+            # print(f'Parsing page {page}')
+            html = get_html(URL, params={'p': page}).text
+            all_html.append(html)
+        with Pool(40) as p:
+            p.map(multi_fun, all_html)
         os.startfile(FILE)
     else:
-        print('Error')
+        print('Error',html.status_code)
 
 
 start_time = time.time()
-URL = 'https://zakupki.prom.ua/gov/tenders?status=6&location=69-72&primary_classifier=45330000-9&createdFrom=2021-03-01&createdTo=2021-03-30'
-parse(URL)
 
-print("--- %s seconds ---" % (time.time() - start_time))
+
+def main():
+    parse(URL)
+
+
+if __name__ == '__main__':
+    start_time = time.time()
+    main()
+    print("--- %s seconds ---" % (time.time() - start_time))
