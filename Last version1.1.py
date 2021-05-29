@@ -1,20 +1,115 @@
-import requests
 from bs4 import BeautifulSoup
 import csv
 import os
 import time
-import calendar
-
-HEADERS = {'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
-                         '(KHTML, like Gecko) Chrome/83.0.4103.106 Safari/537.36', 'accept': '*/*'}
+import asyncio
+import aiohttp
+from fake_useragent import UserAgent
+import random
+listoflinks=[]
+tenders=[]
 FILE = 'tenders.csv'
-
-DATA = {"email": 'katafalk2009@gmail.com', "password": 'katafalk2009'}
-URL_LOGIN = 'https://zakupki.prom.ua/signin'
 COUNTER = 0
+PROXYLIST = open('proxie.txt').read().split('\n')
+URL = 'https://zakupki.prom.ua/gov/tenders?status=6&primary_classifier=45330000-9'
+async def run():
+    urls=get_page_urls(URL)
+    sem = asyncio.Semaphore(50)
+    async with aiohttp.ClientSession() as session:
+        tasks=[asyncio.create_task(get_tenders_url(sem, url, session)) for url in urls]
+        await asyncio.gather(*tasks)
 
-S = requests.Session()
-R = S.post(URL_LOGIN, data=DATA)
+    async with aiohttp.ClientSession() as session:
+        tasks = [asyncio.create_task(parse_page(sem, url, session)) for url in listoflinks]
+        await asyncio.gather(*tasks)
+
+async def get_tenders_url(sem, url, session):
+    async with sem:
+        while True:
+            try:
+                async with session.get(url, proxy="http://"+random.choice(PROXYLIST),
+                                       headers={'user-agent': UserAgent().random}) as response:
+                    print(url)
+                    body = await response.text()
+                    soup = BeautifulSoup(body, 'html.parser')
+                    items = soup.find_all('div', class_='qa_state_purchase_list')
+                    list_from_page=[item.find('a', class_='zkb-list__heading qa_title_link').get('href') for item in items]
+                    listoflinks.extend(list_from_page)
+            except Exception as e:
+                print(e)
+                continue
+            break
+
+
+
+
+def get_page_urls(url):
+    urls = [url+f'&p={page}' for page in range(1,50)]
+    # for page in range(1, 5):
+    #     print(f'Parsing page {page}')
+    #     urls.append(url+f'&p={page}')
+    return urls
+
+
+async def parse_page(sem, link, session):
+    """
+    Calls all small parsing methods on a soup of 1 webpage.
+    And returns dict whis is added to big list with all other pages.
+    :param soup:
+    :param link:
+    :param item:
+    :return:
+    """
+    async with sem:
+        while True:
+            try:
+                async with session.get(link, proxy="http://"+random.choice(PROXYLIST),headers=HEADERS) as response:
+                    body = await response.text()
+                    global COUNTER
+                    COUNTER+=1
+                    print(link)
+                    soup=BeautifulSoup(body, 'html.parser')
+                    #TODO тут надо сделать нормальній новій парсер
+                    #tender_dict={'title':soup.find('h1',class_='h-break-word').get_text(strip=True), 'link':link}
+
+                    tenders.append(tender_dict)
+            except Exception as e:
+                print(e)
+                continue
+            break
+def save_file(items, path):
+    """
+    Saving all parsed data in file.
+    :param items: List of dictionaries, with all parsed data
+    :param path: String, path and name of File to save data.
+    :return:
+    """
+    with open(path, 'w', newline='', encoding='utf-8') as file:
+        writer = csv.writer(file, delimiter=';')
+        writer.writerow(['номер', 'Регіон', 'КОД ДК', 'Вартість', 'название', 'Замовник', 'ссылка', 'Процедура',
+                         'Статус', 'Переможець', 'ЕДРПОУ', 'Имя', 'Email', 'Телефон'])
+        for item in items:
+            writer.writerow([item['number'], item['region'], item['code DK'], item['value'], item['title'],
+                             item['organizer'], item['link'], item['procedure'], item['status'], item['award'],
+                             item['EDRPOU'], item['contact'], item['e-mail'], item['telephone']])
+start_time = time.time()
+policy = asyncio.WindowsSelectorEventLoopPolicy()
+asyncio.set_event_loop_policy(policy)
+loop = asyncio.get_event_loop()
+main = asyncio.create_task(run())
+loop.run_until_complete(main)
+print(len(listoflinks))
+print("--- %s seconds ---" % (time.time() - start_time))
+save_file(tenders,FILE)
+with open(FILE, 'w', newline='', encoding='utf-8') as file:
+    writer = csv.writer(file, delimiter=';')
+    writer.writerow(['номер', 'Регіон'])
+    for item in tenders:
+        writer.writerow([item['title'], item['link']])
+
+os.startfile(FILE)
+
+
 
 
 def save_file(items, path):
@@ -301,6 +396,9 @@ def parse(url):
     :return:
     """
     html = get_html(url, params=None)
+    for page in range(3, 4):
+        print(f'Parsing page {page}')
+        html = get_html(URL, params={'p': page})
     if html.status_code == 200:
         tenders = []
         pages_count = get_pages_count(html.text)
@@ -315,9 +413,8 @@ def parse(url):
     else:
         print('Error')
 
+#start_time = time.time()
 
-start_time = time.time()
-URL = 'https://zakupki.prom.ua/gov/tenders?status=6&location=69-72&primary_classifier=45330000-9&createdFrom=2021-03-01&createdTo=2021-03-30'
-parse(URL)
+#parse(URL)
 
-print("--- %s seconds ---" % (time.time() - start_time))
+#print("--- %s seconds ---" % (time.time() - start_time))
